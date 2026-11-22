@@ -18,9 +18,16 @@ class EventDispatcher
     /** @var array<class-string, array<int, mixed>> */
     protected array $listeners = [];
 
-    /** 注册监听器 */
+    /** 注册监听器:支持单个监听器或监听器列表(数组套数组自动展开) */
     public function on(string $eventName, $listener): void
     {
+        // 监听器列表形态: [[Class,'m'],[Class,'m']] —— 逐个展开注册
+        if (is_array($listener) && isset($listener[0]) && is_array($listener[0])) {
+            foreach ($listener as $single) {
+                $this->on($eventName, $single);
+            }
+            return;
+        }
         $this->listeners[$eventName][] = $listener;
     }
 

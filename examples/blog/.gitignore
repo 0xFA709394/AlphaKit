@@ -1,0 +1,5 @@
+.env
+database/*.sqlite*
+storage/*
+!storage/.gitkeep
+.DS_Store

@@ -139,6 +139,19 @@ if (!function_exists('json_response')) {
     }
 }
 
+if (!function_exists('url')) {
+    /**
+     * 命名路由 URL 生成
+     *
+     * url('post.show', ['id' => 5]); // -> /posts/5
+     * 可选参数未提供时整段移除
+     */
+    function url(string $name, array $params = []): string
+    {
+        return app(\AlphaKit\Core\Router::class)->url($name, $params);
+    }
+}
+
 if (!function_exists('view')) {
     /**
      * 渲染视图

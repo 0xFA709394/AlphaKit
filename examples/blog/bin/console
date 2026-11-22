@@ -1,0 +1,19 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Blog 示例项目 —— CLI 入口(php bin/console <command>)
+ */
+
+declare(strict_types=1);
+
+define('BASE_PATH', dirname(__DIR__));
+
+require dirname(__DIR__, 3) . '/alphakit/bootstrap.php';
+
+if (PHP_SAPI !== 'cli') {
+    exit("请在命令行运行\n");
+}
+
+$app = \AlphaKit\Core\Application::getInstance();
+
+exit($app->make(\AlphaKit\Console\ConsoleApplication::class)->run($argv));

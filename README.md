@@ -123,6 +123,7 @@ php bin/alphakit key:generate                             # 生成 JWT_SECRET �
 
 | 文档 | 内容 |
 |------|------|
+| [examples/blog/](examples/blog/) | ★ **全用法示例项目 AlphaBlog**(41 项端到端测试,覆盖框架每个方面) |
 | [docs/01-快速开始.md](docs/01-快速开始.md) | 安装、配置、目录结构、生命周期 |
 | [docs/02-路由与控制器.md](docs/02-路由与控制器.md) | 路由定义、参数约束、中间件、控制器、响应 |
 | [docs/03-数据库与模型.md](docs/03-数据库与模型.md) | 查询构造器、Model ORM、关联、事务、迁移 |
@@ -131,6 +132,7 @@ php bin/alphakit key:generate                             # 生成 JWT_SECRET �
 | [docs/06-缓存日志验证.md](docs/06-缓存日志验证.md) | 缓存、日志、参数校验、Session、视图 |
 | [docs/07-认证与HTTP客户端.md](docs/07-认证与HTTP客户端.md) | JWT、登录注册、限流、HTTP 客户端 |
 | [docs/08-部署指南.md](docs/08-部署指南.md) | Nginx/FPM、队列常驻、cron、安全清单 |
+| [docs/09-测试与质量保障.md](docs/09-测试与质量保障.md) | 三套测试套件、框架不变量、审查方法论 |
 
 ## 典型场景
 

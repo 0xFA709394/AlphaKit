@@ -36,8 +36,11 @@ abstract class Controller
         return $validator->validated();
     }
 
-    /** 渲染视图 */
-    protected function view(string $template, array $data = []): Response
+    /**
+     * 渲染视图
+     * (命名避开 view —— 该名字常被用作动作方法,与基类签名冲突会 fatal)
+     */
+    protected function render(string $template, array $data = []): Response
     {
         return view($template, $data);
     }

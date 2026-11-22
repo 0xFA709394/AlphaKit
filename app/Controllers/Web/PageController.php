@@ -17,7 +17,7 @@ final class PageController extends Controller
     /** GET / 首页 */
     public function welcome(Request $request): Response
     {
-        return $this->view('welcome', [
+        return $this->render('welcome', [
             'appName' => (string)config('app.name'),
             'phpVersion' => PHP_VERSION,
             'features' => [
@@ -34,7 +34,7 @@ final class PageController extends Controller
     /** GET /docs 能力总览 */
     public function docs(): Response
     {
-        return $this->view('docs', [
+        return $this->render('docs', [
             'routes' => $this->sampleRoutes(),
         ]);
     }
@@ -52,7 +52,7 @@ final class PageController extends Controller
             $session->flash('hello', '欢迎首次访问!');
         }
 
-        return $this->view('session', [
+        return $this->render('session', [
             'visits' => $visits,
             'flash' => (string)$session->getFlash('hello', ''),
             'sessionId' => substr($session->id(), 0, 8),

@@ -8,16 +8,22 @@
 declare(strict_types=1);
 
 define('ALPHAKIT_START', microtime(true));
-define('BASE_PATH', dirname(__DIR__));
+// 允许外部项目(如 examples/)预先定义 BASE_PATH 指向自身根目录,
+// 使 App\ 自动加载 / config / storage / routes 全部路由到该项目
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', dirname(__DIR__));
+}
 
 // 优先使用 composer autoloader(存在 vendor 时)
-if (is_file(BASE_PATH . '/vendor/autoload.php')) {
-    require BASE_PATH . '/vendor/autoload.php';
+if (is_file(__DIR__ . '/../vendor/autoload.php')) {
+    require __DIR__ . '/../vendor/autoload.php';
 } else {
-    // 内置 PSR-4 自动加载器:AlphaKit\ -> alphakit/src/, App\ -> app/
+    // 内置 PSR-4 自动加载器:
+    //   AlphaKit\ -> 框架自身 src/(相对本文件,与 BASE_PATH 无关)
+    //   App\      -> BASE_PATH/app/(外部项目可重定向)
     spl_autoload_register(function (string $class): void {
         $prefixes = [
-            'AlphaKit\\' => BASE_PATH . '/alphakit/src/',
+            'AlphaKit\\' => __DIR__ . '/src/',
             'App\\'      => BASE_PATH . '/app/',
         ];
         foreach ($prefixes as $prefix => $dir) {
@@ -33,4 +39,4 @@ if (is_file(BASE_PATH . '/vendor/autoload.php')) {
     });
 }
 
-require BASE_PATH . '/alphakit/src/Support/helpers.php';
+require __DIR__ . '/src/Support/helpers.php';
