@@ -301,6 +301,63 @@ t('Session GC 保留新鲜文件', file_exists($newFile));
 $sig = new ReflectionProperty(AlphaKit\Console\Commands\MakeJob::class, 'signature');
 t('make:job 签名含 --force 声明', str_contains((string)$sig->getValue(new AlphaKit\Console\Commands\MakeJob()), '{--force'));
 
+echo "── 11. 第五轮审查回归 ──\n";
+// 事件系统四种监听器形态
+$events = new AlphaKit\Core\Event\EventDispatcher();
+$ev = new stdClass();
+$ev->n = 9;
+$events->on(stdClass::class, fn ($e) => 'closure:' . $e->n);
+$listenerObj = new class {
+    public function go($e)
+    {
+        return 'obj:' . $e->n;
+    }
+};
+$events->on(stdClass::class, [$listenerObj, 'go']);
+t('事件:闭包+对象方法监听', $events->dispatch($ev) === ['closure:9', 'obj:9']);
+
+// join / increment / chunk 真跑
+$joined = QueryBuilder::table('tasks')->join('users', 'users.id', '=', 'tasks.user_id')->select('tasks.title', 'users.email')->limit(2)->get();
+t('join 真跑并返回两表列', isset($joined[0]['title'], $joined[0]['email']));
+
+QueryBuilder::table('tasks')->where('id', 1)->increment('done', 4);
+$incVal = (int)QueryBuilder::table('tasks')->where('id', 1)->value('done');
+QueryBuilder::table('tasks')->where('id', 1)->decrement('done', 4);
+$decVal = (int)QueryBuilder::table('tasks')->where('id', 1)->value('done');
+t('increment/decrement 原子更新', $incVal === $decVal + 4);
+
+QueryBuilder::table('tasks')->where('user_id', 556)->delete();
+for ($i = 1; $i <= 7; $i++) {
+    QueryBuilder::table('tasks')->insert(['user_id' => 556, 'title' => "u5-$i", 'done' => 0, 'created_at' => now(), 'updated_at' => now()]);
+}
+$seen = [];
+QueryBuilder::table('tasks')->where('user_id', 556)->orderBy('id')->chunk(3, function ($rows) use (&$seen) {
+    foreach ($rows as $r) {
+        $seen[] = $r['id'];
+    }
+    return true;
+});
+QueryBuilder::table('tasks')->where('user_id', 556)->delete();
+t('chunk 分批全覆盖无重复', count($seen) === 7 && count($seen) === count(array_unique($seen)));
+
+// download 缺失文件抛 404
+t('download 缺失文件抛 NotFoundException', throws(fn () => Response::download('/nonexistent/x.bin'), '文件不存在'));
+
+// Session regenerate:换 ID 保数据
+$regDir = storage_path('cache/sessions-unit');
+$sReg = new Session($regDir);
+$sReg->start(new Request('GET', '/', [], [], []));
+$sReg->put('rk', 'rv');
+$oldSid = $sReg->id();
+$sReg->save(new Response(''));
+$sReg->regenerate();
+t('regenerate 换新 ID', $sReg->id() !== $oldSid);
+t('regenerate 保留数据', $sReg->get('rk') === 'rv');
+
+// Config 运行时写入
+app(AlphaKit\Core\Config::class)->set('runtime.unit.probe', 'v5');
+t('Config set 运行时生效', config('runtime.unit.probe') === 'v5');
+
 echo "\n════════════════════════════\n";
 echo "  通过: {$passed}   失败: {$failed}\n";
 exit($failed === 0 ? 0 : 1);

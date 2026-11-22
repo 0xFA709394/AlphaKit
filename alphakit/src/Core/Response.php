@@ -74,11 +74,14 @@ class Response
         return self::json($payload, $status);
     }
 
-    /** 下载文件 */
+    /** 下载文件(缺失时抛 404 而非静默空下载) */
     public static function download(string $filePath, ?string $name = null): self
     {
+        if (!is_file($filePath)) {
+            throw new \AlphaKit\Core\Exception\NotFoundException('文件不存在: ' . basename($filePath));
+        }
         $name = $name ?? basename($filePath);
-        $resp = new self(file_get_contents($filePath) ?: '');
+        $resp = new self((string)file_get_contents($filePath));
         return $resp->withHeader('Content-Type', 'application/octet-stream')
             ->withHeader('Content-Disposition', 'attachment; filename="' . $name . '"');
     }
