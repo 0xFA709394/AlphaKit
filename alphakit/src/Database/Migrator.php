@@ -65,7 +65,7 @@ class Migrator
             }
 
             $migration = $this->resolve($file, $name);
-            $migration->up();
+            $this->runOnOwnedConnection(fn () => $migration->up());
             $this->connection->insert('migrations', ['migration' => $name, 'batch' => $nextBatch]);
             $executed[] = $name;
         }
@@ -94,7 +94,8 @@ class Migrator
             if ($file === null) {
                 continue;
             }
-            $this->resolve($file, $name)->down();
+            $migration = $this->resolve($file, $name);
+            $this->runOnOwnedConnection(fn () => $migration->down());
             $this->connection->delete('migrations', $this->connection->wrap('migration') . ' = ?', [$name]);
             $rolled[] = $name;
         }
@@ -142,12 +143,17 @@ class Migrator
         }
         $class = str_replace('_', '', ucwords($base, '_'));
 
-        // require 前预检:类名已存在 = 与其他迁移文件同名(fatal 不可捕获,必须提前拦截)
+        // 类已加载:必须由同一文件定义。
+        // 同进程先 migrate 后 rollback 的正常复用 → 直接实例化;
+        // 定义于其他文件 = 两个迁移文件同名类冲突(require 会触发不可捕获的 fatal,必须提前拦截)
         if (class_exists($class, false)) {
-            $definedIn = (new \ReflectionClass($class))->getFileName();
-            throw new \RuntimeException(
-                "迁移类名冲突: [$class] 已由 [" . basename((string)$definedIn) . "] 定义,请重命名 [$name] 中的迁移类"
-            );
+            $definedIn = (string)(new \ReflectionClass($class))->getFileName();
+            if (realpath($definedIn) !== realpath($file)) {
+                throw new \RuntimeException(
+                    "迁移类名冲突: [$class] 已由 [" . basename($definedIn) . "] 定义,请重命名 [$name] 中的迁移类"
+                );
+            }
+            return new $class();
         }
 
         $result = require $file;
@@ -169,6 +175,27 @@ class Migrator
         }
 
         return new $class();
+    }
+
+    /**
+     * 在 Migrator 所属连接上执行迁移体:
+     * Schema/Blueprint/Model 均走全局容器连接 —— 临时重绑保证迁移内的
+     * DDL/数据操作与 migrations 记账表落在同一连接,注入自定义连接时
+     * 不再出现"记账在 A、建表在 B"的静默分离
+     */
+    protected function runOnOwnedConnection(callable $fn): void
+    {
+        if (app(Connection::class) === $this->connection) {
+            $fn();
+            return;
+        }
+        $global = app(Connection::class);
+        app()->instance(Connection::class, $this->connection);
+        try {
+            $fn();
+        } finally {
+            app()->instance(Connection::class, $global);
+        }
     }
 
     protected function findFile(string $name): ?string

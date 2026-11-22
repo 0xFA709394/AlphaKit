@@ -379,6 +379,86 @@ t('Session cookie 携带 SameSite', is_array($sent) && ($sent[3]['samesite'] ?? 
 $badReq = new Request('POST', '/api/x', [], [], ['CONTENT_TYPE' => 'application/json']);
 t('畸形 JSON 解析为空数组不致命', is_array($badReq->all()));
 
+echo "── 13. 第七轮审查回归(规则矩阵/JWT 多算法/隔离迁移) ──\n";
+// 验证器规则矩阵:应通过
+$okMatrix = new Validator([
+    'url' => 'https://x.dev/a?b=1', 'ip' => '10.0.0.1', 'date' => '2026-11-22 14:00:00',
+    'flag' => '1', 'arr' => [1, 2], 'slug' => 'abc-123_x', 'num' => '3.14',
+    'code' => '123456', 'role' => 'admin', 'age' => 30,
+], [
+    'url' => 'url', 'ip' => 'ip', 'date' => 'date', 'flag' => 'boolean',
+    'arr' => 'array', 'slug' => 'alpha_dash', 'num' => 'numeric',
+    'code' => 'regex:/^\d{6}$/', 'role' => 'in:admin,editor', 'age' => 'integer|between:18,65',
+]);
+t('验证器矩阵:合法数据全通过', $okMatrix->passes());
+
+// 验证器规则矩阵:应失败(url/ip/date/flag/arr/slug/code/role/confirmed/same)
+$badMatrix = new Validator([
+    'url' => 'not-url', 'ip' => '999.1.1.1', 'date' => 'tomorrow??', 'flag' => 'maybe',
+    'arr' => 'str', 'slug' => '空 格', 'code' => '12ab', 'role' => 'guest',
+    'pwd' => 'x', 'pwd_c' => 'y', 'a' => '1', 'b' => '2',
+], [
+    'url' => 'url', 'ip' => 'ip', 'date' => 'date', 'flag' => 'boolean',
+    'arr' => 'array', 'slug' => 'alpha_dash', 'code' => 'regex:/^\d{6}$/',
+    'role' => 'in:admin,editor', 'pwd' => 'confirmed', 'a' => 'same:b',
+]);
+t('验证器矩阵:10 类非法数据全拦截', $badMatrix->fails() && count($badMatrix->errors()) === 10);
+
+// JWT 多算法 + alg=none 攻击
+$j384 = JWT::encode(['sub' => 3], 'k3', 'HS384', 60);
+$j512 = JWT::encode(['sub' => 5], 'k5', 'HS512', 60);
+t('JWT HS384/HS512 编解码', JWT::decode($j384, 'k3')['sub'] === 3 && JWT::decode($j512, 'k5')['sub'] === 5);
+$noneToken = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOjF9.';
+t('alg=none 攻击被拦截', throws(fn () => JWT::decode($noneToken, 'any'), '不支持的 JWT 算法'));
+
+// Model timestamps=false 不写时间戳
+class UnitNoTs extends AlphaKit\Database\Model
+{
+    protected string $table = 'tasks';
+    protected bool $timestamps = false;
+}
+$noTs = new UnitNoTs(['user_id' => 778, 'title' => 'no-ts', 'done' => 0]);
+$noTs->save();
+$noTsRow = QueryBuilder::table('tasks')->where('user_id', 778)->first();
+QueryBuilder::table('tasks')->where('user_id', 778)->delete();
+t('timestamps=false 不写 created_at', is_array($noTsRow) && empty($noTsRow['created_at']));
+
+// Migrator 隔离连接路由 + reset 全链路(主库零污染)
+$tmpDb = storage_path('unit-reset.sqlite');
+@unlink($tmpDb);
+$isoConn = new Connection(['driver' => 'sqlite', 'database' => $tmpDb]);
+$isoConn->pdo()->exec('CREATE TABLE migrations ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "migration" TEXT NOT NULL, "batch" INT NOT NULL)');
+$isoMig = new AlphaKit\Database\Migrator($isoConn);
+$mkIso = fn (string $cls, string $tbl) => "<?php use AlphaKit\\Database\\Migration; use AlphaKit\\Database\\Schema\\{Blueprint, Schema}; final class {$cls} extends Migration { public function up(): void { Schema::create(\"{$tbl}\", fn (Blueprint \$t) => \$t->id()->string(\"name\")); } public function down(): void { Schema::dropIfExists(\"{$tbl}\"); } }";
+$fA = database_path('migrations/9999_01_01_000001_unit_iso_a.php');
+$fB = database_path('migrations/9999_01_01_000002_unit_iso_b.php');
+file_put_contents($fA, $mkIso('UnitIsoA', 'unit_iso_a'));
+file_put_contents($fB, $mkIso('UnitIsoB', 'unit_iso_b'));
+try {
+    $isoMig->migrate();
+    t('隔离 Migrator 建表进隔离库', $isoConn->tableExists('unit_iso_a') && $isoConn->tableExists('unit_iso_b'));
+    t('主库零污染', !QueryBuilder::table('migrations')->where('migration', 'like', '%unit_iso%')->exists()
+        && !app(Connection::class)->tableExists('unit_iso_a'));
+    // 隔离库扫描全局迁移目录:2 个真实迁移 + 2 个隔离迁移 = 4
+    $resetCount = count($isoMig->reset());
+    t('reset 全链路回滚清账', $resetCount === 4 && !$isoConn->tableExists('unit_iso_a')
+        && !$isoConn->tableExists('users') && (int)$isoConn->scalar('SELECT COUNT(*) FROM migrations') === 0);
+} finally {
+    @unlink($fA);
+    @unlink($fB);
+    @unlink($tmpDb);
+}
+
+// 控制台纠错建议(建议走 STDERR,用子进程合并流捕获端到端验证)
+$merged = shell_exec(sprintf('cd %s && %s bin/alphakit migrte 2>&1', escapeshellarg(dirname(__DIR__)), escapeshellarg(PHP_BINARY)));
+t('误拼命令给出建议', is_string($merged) && str_contains($merged, 'migrate') && str_contains($merged, '是否想用'));
+
+// Request 语义
+$rq = new Request('POST', '/x?a=1', ['a' => 'q', 'b' => 'q2'], ['a' => 'body'], ['REQUEST_METHOD' => 'POST']);
+t('body 覆盖同名 query', $rq->input('a') === 'body');
+t('query 独有键保留', $rq->input('b') === 'q2');
+t('only 按键提取', $rq->only(['a']) === ['a' => 'body']);
+
 echo "\n════════════════════════════\n";
 echo "  通过: {$passed}   失败: {$failed}\n";
 exit($failed === 0 ? 0 : 1);
