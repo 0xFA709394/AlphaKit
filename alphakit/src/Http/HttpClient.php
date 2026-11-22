@@ -117,7 +117,7 @@ class HttpClient
                     $this->bodyFormat ??= 'json';
                 }
                 $options[CURLOPT_POSTFIELDS] = $this->bodyFormat === 'json'
-                    ? json_encode($data, JSON_UNESCAPED_UNICODE)
+                    ? (string)(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}')
                     : http_build_query((array)$data);
             }
         }

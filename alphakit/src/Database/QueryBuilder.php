@@ -473,7 +473,12 @@ class QueryBuilder
                     /** @var self $sub */
                     $sub = $where['column'];
                     [$subSql, $subBindings] = $sub->compileWheres();
-                    $sql .= $boolean . '(' . trim((string)preg_replace('/^\s*WHERE/i', '', $subSql)) . ')';
+                    $inner = trim((string)preg_replace('/^\s*WHERE/i', '', $subSql));
+                    if ($inner === '') {
+                        // 空条件组:跳过(否则生成 "AND ()" 非法 SQL)
+                        continue 2;
+                    }
+                    $sql .= $boolean . '(' . $inner . ')';
                     $bindings = array_merge($bindings, $subBindings);
                     break;
             }

@@ -87,7 +87,7 @@ class Logger
             $this->channel,
             strtoupper($level),
             $message,
-            $context !== [] ? json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : ''
+            $context !== [] ? (string)(json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]') : ''
         );
 
         @file_put_contents($this->file(), $line, FILE_APPEND | LOCK_EX);

@@ -27,13 +27,19 @@ class Dotenv
             $key = trim($key);
             $value = trim($value);
 
-            // 去除引号包裹
-            if (strlen($value) >= 2 && ($value[0] === '"' || $value[0] === "'") && $value[-1] === $value[0]) {
-                $value = substr($value, 1, -1);
+            // 是否被引号包裹(引号内的 # 不是注释)
+            $quoted = strlen($value) >= 2
+                && ($value[0] === '"' || $value[0] === "'")
+                && $value[-1] === $value[0];
+
+            // 行内注释仅对未加引号的值生效
+            if (!$quoted && str_contains($value, ' #')) {
+                $value = rtrim(explode(' #', $value)[0]);
             }
-            // 行内注释
-            if (str_contains($value, ' #')) {
-                $value = trim(explode(' #', $value)[0]);
+
+            // 去除引号包裹
+            if ($quoted) {
+                $value = substr($value, 1, -1);
             }
 
             if (!array_key_exists($key, $_ENV)) {

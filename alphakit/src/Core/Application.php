@@ -123,7 +123,9 @@ class Application extends Container
     {
         error_reporting(E_ALL);
         ini_set('display_errors', '0');
-        date_default_timezone_set((string)$this->envOrDefault('APP_TIMEZONE', 'Asia/Shanghai'));
+        // 时区:config/app.php 优先,回退 .env 与默认值
+        $timezone = (string)config('app.timezone', env('APP_TIMEZONE', 'Asia/Shanghai'));
+        date_default_timezone_set(is_string($timezone) && $timezone !== '' ? $timezone : 'Asia/Shanghai');
 
         set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
             if (!(error_reporting() & $severity)) {
@@ -135,12 +137,6 @@ class Application extends Container
         set_exception_handler(function (Throwable $e): void {
             $this->renderException($e, Request::capture())->send();
         });
-    }
-
-    protected function envOrDefault(string $key, string $default): string
-    {
-        $v = env($key, $default);
-        return is_string($v) ? $v : $default;
     }
 
     // ---------------------------------------------------------------- HTTP

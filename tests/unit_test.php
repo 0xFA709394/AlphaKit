@@ -227,6 +227,27 @@ t('expectsJson 检测', $req->expectsJson());
 t('json 响应统一结构', str_contains(Response::ok(['a' => 1])->body(), '"code":0'));
 t('404 abort 抛 HttpException', throws(fn () => abort(404, 'x'), 'x'));
 
+echo "── 9. 第二轮审查回归 ──\n";
+// Dotenv:引号内的 # 不是注释
+$envFile = tempnam(sys_get_temp_dir(), 'env');
+file_put_contents($envFile, "QV=\"x #1\"\nPV=y #2\n");
+$_ENV = [];
+putenv('QV');
+putenv('PV');
+AlphaKit\Core\Dotenv::load($envFile);
+t('Dotenv 引号值保留 #', env('QV') === 'x #1');
+t('Dotenv 裸值剥离行内注释', env('PV') === 'y');
+@unlink($envFile);
+
+// 空条件组安全跳过
+t('空 whereGroup 被跳过', QueryBuilder::table('tasks')->where('user_id', 1)->whereGroup(fn ($q) => $q)->toSql()[0]
+    === 'SELECT * FROM "tasks" WHERE "user_id" = ?');
+
+// 非法 UTF-8 不再静默产生空 JSON 体
+$badJson = Response::json(['bad' => "\xB1\x31"]);
+t('非法 UTF-8 JSON 仍有响应体', $badJson->body() !== '' && str_contains($badJson->body(), 'bad'));
+t('非法 UTF-8 JSON 含替换符', str_contains($badJson->body(), "\u{FFFD}"));
+
 echo "\n════════════════════════════\n";
 echo "  通过: {$passed}   失败: {$failed}\n";
 exit($failed === 0 ? 0 : 1);

@@ -35,7 +35,9 @@ class Response
 
     public static function json($data, int $status = 200, array $headers = []): self
     {
-        $resp = new self(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $status, $headers);
+        // INVALID_UTF8_SUBSTITUTE:非法 UTF-8 序列替换为 �,避免 json_encode 失败返回空体
+        $body = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+        $resp = new self($body === false ? '{}' : $body, $status, $headers);
         return $resp->withHeader('Content-Type', 'application/json; charset=utf-8');
     }
 
