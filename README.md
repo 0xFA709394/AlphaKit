@@ -123,7 +123,7 @@ php bin/alphakit key:generate                             # 生成 JWT_SECRET �
 
 | 文档 | 内容 |
 |------|------|
-| [examples/blog/](examples/blog/) | ★ **全用法示例项目 AlphaBlog**(41 项端到端测试,覆盖框架每个方面) |
+| [examples/blog/](examples/blog/) | ★ **全用法示例项目 AlphaBlog**(63 项端到端测试,覆盖框架每个方面) |
 | [docs/01-快速开始.md](docs/01-快速开始.md) | 安装、配置、目录结构、生命周期 |
 | [docs/02-路由与控制器.md](docs/02-路由与控制器.md) | 路由定义、参数约束、中间件、控制器、响应 |
 | [docs/03-数据库与模型.md](docs/03-数据库与模型.md) | 查询构造器、Model ORM、关联、事务、迁移 |

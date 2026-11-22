@@ -12,8 +12,9 @@ use App\Jobs\GenerateSitemap;
  */
 final class QueueSitemapGeneration
 {
-    public function handle(PostPublished $event): void
+    public function handle(PostPublished $event): string
     {
         dispatch(new GenerateSitemap());
+        return 'sitemap-queued';
     }
 }

@@ -54,13 +54,13 @@ final class PostController extends Controller
             'views' => 0,
         ]);
 
-        // 事件 → 监听器(审计日志) → 队列(sitemap)
-        app(\AlphaKit\Core\Event\EventDispatcher::class)
+        // 事件 → 监听器(审计日志) → 队列(sitemap);dispatch 返回各监听器回执
+        $receipts = app(\AlphaKit\Core\Event\EventDispatcher::class)
             ->dispatch(new PostPublished((int)$post->id, (string)$post->title));
 
         cache_store()->delete('hot-posts'); // 缓存失效演示
 
-        return $this->ok($post, '发布成功')->withStatus(201);
+        return $this->ok(['post' => $post, 'event_receipts' => $receipts], '发布成功')->withStatus(201);
     }
 
     /** GET /api/posts/{id:\d+} */
@@ -127,10 +127,11 @@ final class PostController extends Controller
             'author_name' => $data['author_name'],
             'body' => $data['body'],
         ]);
-        dispatch(new \App\Jobs\SendCommentNotification([
+        // 命名队列演示:通知走 notifications 队列(与 default 的 sitemap 队列分离)
+        app(\AlphaKit\Queue\QueueManager::class)->push(new \App\Jobs\SendCommentNotification([
             'post_id' => (int)$post->id,
             'author_email' => (string)($request->user['email'] ?? ''),
-        ]));
+        ]), 'notifications');
         return $this->ok($comment, '评论已提交,通知已入队')->withStatus(201);
     }
 

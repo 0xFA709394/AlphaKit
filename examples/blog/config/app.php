@@ -31,6 +31,7 @@ return [
         \App\Commands\BlogStatsCommand::class,
         \App\Commands\PostsPublishCommand::class,
         \App\Commands\PostsCleanupCommand::class,
+        \App\Commands\TagsSyncCommand::class,
     ],
 
     'route_files' => [

@@ -6,7 +6,8 @@ declare(strict_types=1);
  * Blog 示例种子数据:php bin/console db:seed
  */
 
-use App\Models\{Comment, Post, User};
+use AlphaKit\Database\QueryBuilder;
+use App\Models\{Comment, Post, Tag, User};
 
 return function (): void {
     if (User::query()->where('email', '=', 'author@blog.dev')->first() === null) {
@@ -32,5 +33,15 @@ return function (): void {
         Comment::create(['post_id' => 1, 'author_name' => '读者小王', 'body' => '写得很清楚,学习了!']);
         Comment::create(['post_id' => 1, 'author_name' => '匿名访客', 'body' => '期待更多框架细节文章。']);
         echo "已创建 3 篇文章 + 2 条评论\n";
+    }
+
+    if (Tag::count() === 0) {
+        // insertMany 批量插入演示
+        QueryBuilder::table('tags')->insertMany([
+            ['name' => 'php', 'weight' => 90, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'framework', 'weight' => 80, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'alphakit', 'weight' => 100, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        echo "已插入 3 个标签(insertMany)\n";
     }
 };

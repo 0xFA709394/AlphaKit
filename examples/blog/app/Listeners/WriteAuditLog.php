@@ -11,8 +11,9 @@ use App\Events\PostPublished;
  */
 final class WriteAuditLog
 {
-    public function handle(PostPublished $event): void
+    public function handle(PostPublished $event): string
     {
         logger('audit')->info('文章已发布', ['id' => $event->postId, 'title' => $event->title]);
+        return 'audit-logged';
     }
 }

@@ -23,3 +23,6 @@ $schedule->command('posts:cleanup')->dailyAt('03:00')->name('清理超期草稿'
 
 // 标准 cron:每小时整点生成 sitemap(直接派发队列任务)
 $schedule->call(fn () => dispatch(new \App\Jobs\GenerateSitemap()))->hourly()->name('每小时 sitemap');
+
+// 每 15 分钟:标签缓存预热(everyFifteenMinutes 表达式演示)
+$schedule->call(fn () => dispatch(new \App\Jobs\WarmTagCache()))->everyFifteenMinutes()->name('标签缓存预热');

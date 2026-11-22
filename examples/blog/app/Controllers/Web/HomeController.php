@@ -97,16 +97,34 @@ final class HomeController extends Controller
         return Response::redirect(\url('home'));
     }
 
-    /** GET /session-info —— Session 计数演示 */
+    /** GET /archive/{page?} —— 可选路由参数演示 */
+    public function archive(Request $request): Response
+    {
+        $page = (int)($request->params['page'] ?? 1);   // 缺省 1
+        $posts = Post::query()->where('published', '=', 1)
+            ->orderBy('id', 'desc')->limit(5)->offset(($page - 1) * 5)->get();
+        return $this->render('pages/archive', ['page' => $page, 'posts' => $posts]);
+    }
+
+    /** GET /legacy-home —— 301 永久重定向 */
+    public function legacyHome(): Response
+    {
+        return Response::redirect(\url('home'), 301);
+    }
+
+    /** GET /session-info —— Session 计数 + has/all 演示 */
     public function sessionInfo(Request $request): Response
     {
         /** @var Session $session */
         $session = app(Session::class);
         $visits = (int)$session->get('visits', 0) + 1;
         $session->put('visits', $visits);
+
         return $this->render('pages/session', [
             'visits' => $visits,
             'sessionId' => substr($session->id(), 0, 8),
+            'keyCount' => count($session->all()),                 // all()
+            'loggedIn' => $session->has('user_name'),             // has()
         ]);
     }
 }

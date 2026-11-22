@@ -1,6 +1,6 @@
 # AlphaBlog —— AlphaKit 全用法示例项目
 
-一个基于 AlphaKit 的完整博客系统,覆盖框架**每一个方面**的用法。
+一个基于 AlphaKit 的完整博客系统,覆盖框架**每一个方面**的用法(63 项端到端冒烟)。
 
 ## 运行
 
@@ -11,7 +11,7 @@ php bin/console migrate        # 建表(users/posts/comments)
 php bin/console db:seed        # 种子数据(作者 author@blog.dev / blog1234,3 篇文章 2 评论)
 php bin/console blog:stats     # 统计面板
 PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:8090 server.php   # 启动(多 worker 支持 relay 自调)
-bash tests/smoke.sh 8090       # 41 项端到端冒烟测试
+bash tests/smoke.sh 8090       # 63 项端到端冒烟测试
 ```
 
 ## 用法覆盖清单(41 项冒烟逐项验证)
@@ -48,8 +48,29 @@ bash tests/smoke.sh 8090       # 41 项端到端冒烟测试
 | 异常 → 错误页 | `abort(403/404)` 渲染 |
 | CLI 自定义命令 | `blog:stats` / `posts:publish` / `posts:cleanup` |
 | CLI → 事件 → 监听 → 队列 | `posts:publish` 全链路 |
-| 迁移 + 种子 + 幂等 | `migrate` / `db:seed` 可重复执行 |
+| 迁移 + 种子 + 幂等 + 回滚闭环 | `migrate` / `db:seed` / `migrate:rollback`→`migrate`(冒烟验证) |
 | 静态文件安全(realpath 限定) | `server.php` 路径穿越防护(冒烟验证 404) |
+
+### 第二批补全(63 项冒烟)
+
+| 框架能力 | 示例位置 |
+|---------|---------|
+| **代码生成器全链路** | `make:migration/model/controller --api --resource/job/command` 生成 Tag 功能骨架后填充真实现 |
+| QueryBuilder whereBetween + sum/max | `GET /api/tags` |
+| QueryBuilder insertMany | `POST /api/tags/bulk` |
+| QueryBuilder upsert(HTTP + CLI 双入口) | `POST /api/tags/sync` + `tags:sync`(幂等双跑) |
+| QueryBuilder whereIn + orWhere 条件组 | `GET /api/tags/filter` |
+| 命名队列 | 评论通知走 `notifications`、Tag 预热走 `tags`,`queue:work --queue=xx` 分别消费 |
+| 事件 dispatch 返回回执 | 创建文章响应含 `event_receipts: ["audit-logged","sitemap-queued"]` |
+| JWT 多算法 | `POST /api/token/refresh` 签发 HS512 |
+| HttpClient asJson POST + 自定义头 | `POST /api/demo/relay-post`(上游 401 如实转发) |
+| Response::text | `GET /api/demo/text` |
+| 缓存 pull(一次性令牌) | `GET/POST /api/demo/one-time-token`(二次消费拒绝) |
+| 限流 429 实际触发 | `GET /api/demo/limited`(throttle:2,60,第 3 次 429) |
+| 日志多级别 | `GET /api/demo/log-levels`(debug…error 写入,WARNING/ERROR 落盘验证) |
+| 可选路由参数 | `GET /archive/{page?}`(带参/缺省双态) |
+| 301 永久重定向 | `GET /legacy-home` |
+| Session has/all | `/session-info` 键数量与登录态 |
 
 ## 关键文件导览
 
@@ -65,5 +86,5 @@ app/Jobs/              队列任务(重试/失败兜底)
 app/Commands/          三个自定义命令
 app/schedule.php       调度注册表
 database/              迁移 + 种子
-tests/smoke.sh         41 项端到端测试
+tests/smoke.sh         63 项端到端测试
 ```
