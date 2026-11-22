@@ -153,9 +153,23 @@ class Connection
         }
     }
 
-    /** 事务闭包 */
+    /** 事务闭包(支持嵌套:内层自动降级为 SAVEPOINT) */
     public function transaction(callable $callback)
     {
+        // 嵌套事务:用保存点模拟,内层回滚只回滚到保存点
+        if ($this->pdo()->inTransaction()) {
+            $savepoint = 'sp_' . bin2hex(random_bytes(4));
+            $this->execute('SAVEPOINT ' . $savepoint);
+            try {
+                $result = $callback($this);
+                $this->execute('RELEASE SAVEPOINT ' . $savepoint);
+                return $result;
+            } catch (\Throwable $e) {
+                $this->execute('ROLLBACK TO SAVEPOINT ' . $savepoint);
+                throw $e;
+            }
+        }
+
         $this->beginTransaction();
         try {
             $result = $callback($this);

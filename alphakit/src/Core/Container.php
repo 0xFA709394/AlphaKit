@@ -32,6 +32,9 @@ class Container
     /** @var array<string, Closure> 扩展器 */
     protected array $extenders = [];
 
+    /** @var array<string, true> 解析中的抽象(循环依赖检测) */
+    protected array $resolving = [];
+
     /**
      * 绑定
      *
@@ -58,18 +61,27 @@ class Container
         $this->instances[$abstract] = $object;
     }
 
-    /** 解析服务 */
+    /** 解析服务(带循环依赖检测) */
     public function make(string $abstract)
     {
         if (isset($this->instances[$abstract])) {
             return $this->applyExtenders($this->instances[$abstract], $abstract);
         }
 
-        $concrete = $this->bindings[$abstract] ?? $abstract;
+        if (isset($this->resolving[$abstract])) {
+            throw new \RuntimeException('检测到循环依赖: ' . implode(' -> ', [...array_keys($this->resolving), $abstract]));
+        }
 
-        $object = $concrete instanceof Closure
-            ? $concrete($this)
-            : $this->build($concrete);
+        $concrete = $this->bindings[$abstract] ?? $abstract;
+        $this->resolving[$abstract] = true;
+
+        try {
+            $object = $concrete instanceof Closure
+                ? $concrete($this)
+                : $this->build($concrete);
+        } finally {
+            unset($this->resolving[$abstract]);
+        }
 
         if (!empty($this->shared[$abstract])) {
             $this->instances[$abstract] = $object;

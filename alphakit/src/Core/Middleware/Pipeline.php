@@ -90,7 +90,7 @@ class Pipeline
                 if (!$type instanceof \ReflectionNamedType) {
                     continue;
                 }
-                if ($type->getName() === 'int' && is_numeric($value) && (string)(int)$value === $value) {
+                if ($type->getName() === 'int' && preg_match('/^-?\d+$/', $value)) {
                     $parameters[$index] = (int)$value;
                 } elseif ($type->getName() === 'float' && is_numeric($value)) {
                     $parameters[$index] = (float)$value;

@@ -129,26 +129,43 @@ class Migrator
 
     /**
      * 从迁移文件解析 Migration 实例:
-     * 1. 文件 return 实例 -> 直接使用
-     * 2. 否则从文件名推导类名并实例化(如 2024_01_01_000001_create_users_table -> CreateUsersTable)
+     * 1. 推导类名并预检冲突(类重复声明 fatal 不可捕获,必须 require 前拦截)
+     * 2. require 文件:return 实例则直接使用,否则实例化推导类
+     * 3. 归属校验:推导类必须由当前文件定义,防止执行错误迁移
      */
     protected function resolve(string $file, string $name): Migration
     {
-        $result = require $file;
-        if ($result instanceof Migration) {
-            return $result;
-        }
-
         // 去掉日期前缀 2024_01_01_000001_
         $base = preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', '', $name) ?? $name;
         $class = str_replace('_', '', ucwords($base, '_'));
 
-        // 类可能定义在 App 命名空间外(迁移文件无命名空间,直接全局)
-        if (class_exists($class)) {
-            return new $class();
+        // require 前预检:类名已存在 = 与其他迁移文件同名(fatal 不可捕获,必须提前拦截)
+        if (class_exists($class, false)) {
+            $definedIn = (new \ReflectionClass($class))->getFileName();
+            throw new \RuntimeException(
+                "迁移类名冲突: [$class] 已由 [" . basename((string)$definedIn) . "] 定义,请重命名 [$name] 中的迁移类"
+            );
         }
 
-        throw new \RuntimeException("迁移文件 [$name] 未找到可实例化的迁移类 [$class]");
+        $result = require $file;
+
+        // 风格一:文件直接 return Migration 实例
+        if ($result instanceof Migration) {
+            return $result;
+        }
+
+        // 风格二:由文件名推导类名实例化
+        if (!class_exists($class, false)) {
+            throw new \RuntimeException("迁移文件 [$name] 未找到可实例化的迁移类 [$class]");
+        }
+
+        // 类必须由当前文件定义,防止执行到其他文件的同名迁移
+        $definedIn = (string)(new \ReflectionClass($class))->getFileName();
+        if (realpath($definedIn) !== realpath($file)) {
+            throw new \RuntimeException("迁移类名冲突: [$class] 已由 [" . basename($definedIn) . "] 定义,请重命名 [$name] 中的类");
+        }
+
+        return new $class();
     }
 
     protected function findFile(string $name): ?string

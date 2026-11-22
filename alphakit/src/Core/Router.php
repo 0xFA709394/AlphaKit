@@ -106,6 +106,7 @@ class Router
         $middleware = array_merge(...array_merge([[]], $this->groupStack['middleware']));
 
         $route = new Route($method, $fullPath, $handler, $middleware);
+        $route->setRouter($this);
         $this->routes[$method][] = $route;
         $this->allRoutes[] = $route;
         return $route;
@@ -159,6 +160,8 @@ class Router
         foreach ($params as $key => $value) {
             $path = preg_replace('#\{' . $key . '(:[^}]+)?\??\}#', (string)$value, $path, 1);
         }
+        // 未提供值的可选参数整段移除(连同前导斜杠)
+        $path = (string)preg_replace('#/\{[^}]+\?\}#', '', $path);
         return $path;
     }
 

@@ -30,12 +30,20 @@ final class AuthController extends Controller
             'password' => 'required|string|min:6|max:32|confirmed',
         ]);
 
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => password_hash((string)$data['password'], PASSWORD_DEFAULT),
-            'is_active' => 1,
-        ]);
+        try {
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => password_hash((string)$data['password'], PASSWORD_DEFAULT),
+                'is_active' => 1,
+            ]);
+        } catch (\PDOException $e) {
+            // unique 校验与 INSERT 之间的并发窗口由数据库唯一约束兜底(SQLSTATE 23000: 约束冲突)
+            if ($e->getCode() === '23000' || str_contains($e->getMessage(), 'UNIQUE')) {
+                throw new \AlphaKit\Core\Exception\ValidationException(['email' => ['邮箱已被注册']]);
+            }
+            throw $e;
+        }
 
         // 异步发送欢迎邮件(队列演示)
         dispatch(new SendWelcomeEmail(['user_id' => (int)$user->id, 'email' => (string)$user->email]));

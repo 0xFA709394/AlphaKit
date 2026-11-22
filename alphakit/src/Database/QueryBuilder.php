@@ -76,15 +76,24 @@ class QueryBuilder
         return $this;
     }
 
-    /** WHERE column IN (...) */
+    /** WHERE column IN (...) 空集恒假 */
     public function whereIn(string $column, array $values): self
     {
+        if ($values === []) {
+            // IN () 是非法 SQL,空集语义 = 恒假
+            $this->wheres[] = ['type' => 'raw', 'column' => '1 = 0', 'operator' => null, 'value' => null, 'boolean' => 'AND'];
+            return $this;
+        }
         $this->wheres[] = ['type' => 'in', 'column' => $column, 'operator' => 'IN', 'value' => $values, 'boolean' => 'AND'];
         return $this;
     }
 
+    /** WHERE column NOT IN (...) 空集恒真 */
     public function whereNotIn(string $column, array $values): self
     {
+        if ($values === []) {
+            return $this; // NOT IN 空集 = 无过滤条件
+        }
         $this->wheres[] = ['type' => 'in', 'column' => $column, 'operator' => 'NOT IN', 'value' => $values, 'boolean' => 'AND'];
         return $this;
     }
@@ -226,10 +235,16 @@ class QueryBuilder
 
     protected function aggregate(string $function, string $column)
     {
-        $columns = $this->columns;
+        // 聚合必须剥离 排序/分页(带 OFFSET 无 LIMIT 是非法 SQL,排序对聚合无意义且 MySQL 拒绝)
+        $state = [$this->columns, $this->orderBy, $this->limit, $this->offset];
+        [$this->orderBy, $this->limit, $this->offset] = [[], null, null];
         $this->columns = [$function === 'COUNT' && $column === '*' ? 'COUNT(*)' : sprintf('%s(%s)', $function, $this->connection->wrap($column))];
+
         [$sql, $bindings] = $this->toSql();
-        $this->columns = $columns;
+
+        // 恢复(便于链式复用同一构造器)
+        [$this->columns, $this->orderBy, $this->limit, $this->offset] = $state;
+
         return $this->connection->scalar($sql, $bindings);
     }
 
@@ -249,7 +264,7 @@ class QueryBuilder
             'total' => $total,
             'page' => $page,
             'per_page' => $perPage,
-            'last_page' => (int)ceil($total / max(1, $perPage)),
+            'last_page' => max(1, (int)ceil($total / max(1, $perPage))),
         ];
     }
 
@@ -352,20 +367,32 @@ class QueryBuilder
         return $this->connection->execute($sql, $whereBindings);
     }
 
-    /** UPSERT(sqlite 3.24+/mysql) */
+    /** UPSERT:存在则更新(按数据库方言生成语法) */
     public function upsert(array $data, array $uniqueColumns): void
     {
         $columns = array_keys($data);
-        $updates = implode(', ', array_map(fn ($c) => $this->connection->wrap($c) . ' = ?', $columns));
-        $sql = sprintf(
-            'INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s',
-            $this->connection->wrap($this->table),
-            implode(', ', array_map([$this->connection, 'wrap'], $columns)),
-            implode(', ', array_fill(0, count($columns), '?')),
-            implode(', ', array_map([$this->connection, 'wrap'], $uniqueColumns)),
-            $updates
-        );
-        $this->connection->execute($sql, array_merge(array_values($data), array_values($data)));
+        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+        $columnList = implode(', ', array_map([$this->connection, 'wrap'], $columns));
+        $table = $this->connection->wrap($this->table);
+
+        if ($this->connection->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            // MySQL:ON DUPLICATE KEY UPDATE(依赖唯一索引)
+            $updates = implode(', ', array_map(fn ($c) => $this->connection->wrap($c) . ' = VALUES(' . $this->connection->wrap($c) . ')', $columns));
+            $sql = sprintf('INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s', $table, $columnList, $placeholders, $updates);
+            $this->connection->execute($sql, array_values($data));
+        } else {
+            // SQLite 3.24+:ON CONFLICT (...) DO UPDATE
+            $updates = implode(', ', array_map(fn ($c) => $this->connection->wrap($c) . ' = ?', $columns));
+            $sql = sprintf(
+                'INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s',
+                $table,
+                $columnList,
+                $placeholders,
+                implode(', ', array_map([$this->connection, 'wrap'], $uniqueColumns)),
+                $updates
+            );
+            $this->connection->execute($sql, array_merge(array_values($data), array_values($data)));
+        }
     }
 
     // ------------------------------------------------------------------ 编译
@@ -437,6 +464,10 @@ class QueryBuilder
                     break;
                 case 'null':
                     $sql .= $boolean . $this->connection->wrap($where['column']) . ' ' . $where['operator'];
+                    break;
+                case 'raw':
+                    // column 字段承载原始条件表达式(如空 IN 集的 1 = 0)
+                    $sql .= $boolean . $where['column'];
                     break;
                 case 'group':
                     /** @var self $sub */

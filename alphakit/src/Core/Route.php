@@ -9,6 +9,9 @@ namespace AlphaKit\Core;
  */
 class Route
 {
+    /** 注册该路由的 Router(由 addRoute 注入,name() 回写用) */
+    protected ?Router $router = null;
+
     /** @param mixed $handler 闭包或 [Controller::class, 'method'] */
     public function __construct(
         public readonly string $method,
@@ -16,6 +19,13 @@ class Route
         public readonly mixed $handler,
         public array $middleware = []
     ) {
+    }
+
+    /** 注入所属路由器 */
+    public function setRouter(Router $router): self
+    {
+        $this->router = $router;
+        return $this;
     }
 
     /**
@@ -32,18 +42,27 @@ class Route
         return array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
     }
 
-    /** 把 {id} / {id:\d+} / {id?} 编译为正则 */
+    /**
+     * 把 {id} / {id:\d+} / {id?} 编译为正则
+     * 可选参数 {x?} 连同前导斜杠整体可选:/news/{page?} 同时匹配 /news 与 /news/3
+     */
     protected function compile(): string
     {
+        // 1) 可选参数:先在原始 path 上处理,便于把 "/{x?}" 整段替换为 "(?:/...)?"
+        $path = (string)preg_replace_callback(
+            '#/\{(\w+)(?::([^}]+?))?\?\}#',
+            fn (array $m) => '(?:/(?P<' . $m[1] . '>' . ($m[2] ?? '[^/]+') . '))?',
+            $this->path
+        );
+
+        // 2) 转义斜杠
+        $path = str_replace('/', '\/', $path);
+
+        // 3) 必填参数
         return (string)preg_replace_callback(
-            '#\{(\w+)(?::([^}]+))?\??\}#',
-            function (array $m) {
-                $pattern = $m[2] ?? '[^/]+';
-                return substr($m[0], -2) === '?}'
-                    ? '(?P<' . $m[1] . '>' . $pattern . ')?'
-                    : '(?P<' . $m[1] . '>' . $pattern . ')';
-            },
-            str_replace('/', '\/', $this->path)
+            '#\{(\w+)(?::([^}]+))?\}#',
+            fn (array $m) => '(?P<' . $m[1] . '>' . ($m[2] ?? '[^/]+') . ')',
+            $path
         );
     }
 
@@ -54,10 +73,11 @@ class Route
         return $this;
     }
 
-    /** 命名路由 */
+    /** 命名路由(注册到所属 Router) */
     public function name(string $name): self
     {
-        app(Router::class)->registerNamed($name, $this);
+        $owner = $this->router ?? app(Router::class);
+        $owner->registerNamed($name, $this);
         return $this;
     }
 }

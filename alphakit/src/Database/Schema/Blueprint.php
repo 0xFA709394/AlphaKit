@@ -134,9 +134,9 @@ class Blueprint
 
     public function unique(): self
     {
-        // 取最近一列生成表级唯一索引
-        preg_match('/^(?:`|")(\w+)(?:`|")/', end($this->columns), $m);
-        if (!empty($m[1])) {
+        // 取最近一列生成表级唯一索引(空列表时安全跳过)
+        $last = $this->columns === [] ? '' : (string)end($this->columns);
+        if (preg_match('/^(?:`|")(\w+)(?:`|")/', $last, $m)) {
             $this->uniqueIndex($m[1]);
         }
         return $this;

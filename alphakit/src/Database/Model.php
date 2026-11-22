@@ -144,7 +144,12 @@ abstract class Model implements \JsonSerializable
         $connection = static::connection();
 
         if ($this->exists) {
-            $dirty = array_diff_assoc($this->attributes, $this->original);
+            // 严格比较检测脏字段(array_diff_assoc 是松散比较,'1' 与 1 会误判为相同)
+            $dirty = array_filter(
+                $this->attributes,
+                fn ($key) => !array_key_exists($key, $this->original) || $this->original[$key] !== $this->attributes[$key],
+                ARRAY_FILTER_USE_KEY
+            );
             if ($dirty === []) {
                 return true; // 无变更
             }
