@@ -459,6 +459,55 @@ t('body 覆盖同名 query', $rq->input('a') === 'body');
 t('query 独有键保留', $rq->input('b') === 'q2');
 t('only 按键提取', $rq->only(['a']) === ['a' => 'body']);
 
+echo "── 14. 第九轮审查回归(剩余分支全覆盖) ──\n";
+// Router::any 7 谓词全注册
+$r9 = new Router();
+$r9->any('/unit-any', fn () => Response::ok('hit'));
+$anyOk = true;
+foreach (['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as $m) {
+    if ($r9->match($m, '/unit-any') === null) {
+        $anyOk = false;
+    }
+}
+t('any() 7 谓词全部命中', $anyOk);
+
+// resource only:仅生成指定方法,其余 405
+$r9b = new Router();
+$r9b->resource('/unit-only', 'App\\Controllers\\Api\\TaskController', ['index', 'show']);
+t('resource only 仅生成指定路由', count($r9b->all()) === 2
+    && $r9b->match('GET', '/unit-only') !== null
+    && $r9b->match('GET', '/unit-only/3') !== null);
+t('resource only 排除的方法 405', throws(fn () => $r9b->match('POST', '/unit-only')));
+
+// download 正常路径
+$dl = storage_path('unit-download.txt');
+file_put_contents($dl, 'unit-dl');
+$dResp = Response::download($dl, 'unit.txt');
+t('download 正常返回体与附件头', $dResp->body() === 'unit-dl'
+    && ($dResp->headers()['Content-Type'] ?? '') === 'application/octet-stream');
+unlink($dl);
+
+// JWT nbf 未生效拦截
+$h9 = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
+$b9 = rtrim(strtr(base64_encode(json_encode(['sub' => 1, 'nbf' => time() + 3600])), '+/', '-_'), '=');
+$s9 = rtrim(strtr(base64_encode(hash_hmac('sha256', "$h9.$b9", 'k9', true)), '+/', '-_'), '=');
+t('JWT nbf 未生效被拦截', throws(fn () => JWT::decode("$h9.$b9.$s9", 'k9'), '尚未生效'));
+
+// ArrayStore 经 CacheManager 解析,与 file 驱动隔离
+$arrStore = app(AlphaKit\Cache\CacheManager::class)->store('array');
+$arrStore->set('unit9', 'arr-val', 60);
+t('ArrayStore 经管理器读写', $arrStore->get('unit9') === 'arr-val');
+t('ArrayStore 与 file 驱动隔离', cache_store()->get('unit9') === null);
+$arrStore->delete('unit9');
+
+// 缺失 layout 报错清晰
+@mkdir($v9dir = storage_path('unit-views-r9'), 0755, true);
+file_put_contents($v9dir . '/x.php', '<?php $this->extend("no-such-layout"); ?>body');
+$v9 = new AlphaKit\View\ViewEngine($v9dir);
+t('缺失 layout 报错清晰', throws(fn () => $v9->renderString('x'), '不存在'));
+@unlink($v9dir . '/x.php');
+@rmdir($v9dir);
+
 echo "\n════════════════════════════\n";
 echo "  通过: {$passed}   失败: {$failed}\n";
 exit($failed === 0 ? 0 : 1);
