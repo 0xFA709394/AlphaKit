@@ -11,7 +11,7 @@ use AlphaKit\Console\Command;
  */
 class MakeJob extends Command
 {
-    protected string $signature = 'make:job {name : 任务类名}';
+    protected string $signature = 'make:job {name : 任务类名} {--force : 覆盖已存在文件}';
     protected string $description = '生成队列任务类';
 
     protected function handle(): ?int

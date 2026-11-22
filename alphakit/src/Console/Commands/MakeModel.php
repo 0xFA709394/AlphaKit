@@ -11,7 +11,7 @@ use AlphaKit\Console\Command;
  */
 class MakeModel extends Command
 {
-    protected string $signature = 'make:model {name : 模型类名} {--table= : 关联表名} {--migration : 同时生成迁移}';
+    protected string $signature = 'make:model {name : 模型类名} {--table= : 关联表名} {--migration : 同时生成迁移} {--force : 覆盖已存在文件}';
     protected string $description = '生成 Active Record 模型';
 
     protected function handle(): ?int

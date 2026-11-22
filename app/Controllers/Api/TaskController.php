@@ -93,10 +93,14 @@ final class TaskController extends Controller
         return $this->ok(['id' => $task->id], '删除成功');
     }
 
-    /** GET /api/users/{id}/tasks (关联演示) */
+    /** GET /api/users/{id}/tasks (关联演示;仅可查看自己的任务) */
     public function forUser(Request $request): Response
     {
-        $user = \App\Models\User::findOrFail((int)$request->params['id']);
+        $userId = (int)$request->params['id'];
+        if ($userId !== (int)$request->user['id']) {
+            \abort(403, '仅可查看自己的任务');
+        }
+        $user = \App\Models\User::findOrFail($userId);
         return $this->ok($user->tasks());
     }
 

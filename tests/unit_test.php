@@ -283,6 +283,24 @@ $t2 = $resolve->invoke($mig, $migFile2, '20261122_140102_unit_prefix_b') instanc
 t('迁移前缀推导:六段数字格式', $t1);
 t('迁移前缀推导:Ymd_His 格式(生成器)', $t2);
 
+// Session GC:过期会话文件被清理,新鲜文件保留
+$gcDir = storage_path('cache/sessions-gc');
+@mkdir($gcDir, 0755, true);
+$oldFile = $gcDir . '/sess_' . sha1('old');
+$newFile = $gcDir . '/sess_' . sha1('new');
+file_put_contents($oldFile, 'a:0:{}');
+touch($oldFile, time() - 7200 - 600);
+file_put_contents($newFile, 'a:0:{}');
+$gc = new ReflectionMethod(Session::class, 'gc');
+$gc->invoke(new Session($gcDir));
+t('Session GC 清理过期文件', !file_exists($oldFile));
+t('Session GC 保留新鲜文件', file_exists($newFile));
+@unlink($newFile);
+
+// make:* 生成器 --force 已声明(签名可解析)
+$sig = new ReflectionProperty(AlphaKit\Console\Commands\MakeJob::class, 'signature');
+t('make:job 签名含 --force 声明', str_contains((string)$sig->getValue(new AlphaKit\Console\Commands\MakeJob()), '{--force'));
+
 echo "\n════════════════════════════\n";
 echo "  通过: {$passed}   失败: {$failed}\n";
 exit($failed === 0 ? 0 : 1);

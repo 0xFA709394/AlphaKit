@@ -97,6 +97,28 @@ class Application extends Container
 
         // 加载路由文件
         $this->loadRoutes();
+
+        // 生产环境弱 JWT 密钥告警
+        $this->warnWeakJwtSecret();
+    }
+
+    /** 生产环境仍使用默认/空 JWT 密钥时记录告警(密钥可被伪造令牌) */
+    protected function warnWeakJwtSecret(): void
+    {
+        $env = (string)$this->make(Config::class)->get('app.env', 'production');
+        file_put_contents('/tmp/ak-marker.log', "enter: env=" . $env . " secret_len=" . strlen((string)$this->make(Config::class)->get('auth.jwt.secret', '')) . "
+", FILE_APPEND);
+        if ($env !== 'production') {
+            return;
+        }
+        $secret = (string)$this->make(Config::class)->get('auth.jwt.secret', '');
+        if ($secret === '' || $secret === 'change-me-in-production' || strlen($secret) < 32) {
+            @file_put_contents(
+                storage_path('logs/security-' . date('Y-m-d') . '.log'),
+                sprintf("[%s] security.WARNING: 生产环境 JWT 密钥过弱(空/默认/短于32位),请执行 php bin/alphakit key:generate\n", date('Y-m-d H:i:s')),
+                FILE_APPEND | LOCK_EX
+            );
+        }
     }
 
     protected function loadRoutes(): void

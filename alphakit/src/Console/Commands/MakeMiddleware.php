@@ -11,7 +11,7 @@ use AlphaKit\Console\Command;
  */
 class MakeMiddleware extends Command
 {
-    protected string $signature = 'make:middleware {name : 中间件类名}';
+    protected string $signature = 'make:middleware {name : 中间件类名} {--force : 覆盖已存在文件}';
     protected string $description = '生成 HTTP 中间件';
 
     protected function handle(): ?int

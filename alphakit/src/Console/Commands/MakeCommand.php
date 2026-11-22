@@ -11,7 +11,7 @@ use AlphaKit\Console\Command;
  */
 class MakeCommand extends Command
 {
-    protected string $signature = 'make:command {name : 命令类名} {--cmd= : 命令名(默认蛇形类名)}';
+    protected string $signature = 'make:command {name : 命令类名} {--cmd= : 命令名(默认蛇形类名)} {--force : 覆盖已存在文件}';
     protected string $description = '生成控制台命令类';
 
     protected function handle(): ?int

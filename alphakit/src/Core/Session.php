@@ -55,7 +55,25 @@ class Session
             $this->data[self::FLASH_KEY]['new'] = [];
         }
 
+        // 概率性 GC:清理过期会话文件(1%,避免每次请求扫描的开销)
+        if (mt_rand(1, 100) === 1) {
+            $this->gc();
+        }
+
         return $this;
+    }
+
+    /** 清理超过生命周期的会话文件 */
+    protected function gc(): void
+    {
+        $lifetime = (int)config('session.lifetime', 7200);
+        $expireAt = time() - $lifetime - 300; // 额外宽限 5 分钟
+        foreach (glob($this->directory . '/sess_*') ?: [] as $file) {
+            $mtime = @filemtime($file);
+            if ($mtime !== false && $mtime < $expireAt) {
+                @unlink($file);
+            }
+        }
     }
 
     /** @return mixed */

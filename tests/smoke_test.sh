@@ -51,6 +51,9 @@ check "更新任务"            "curl -s -X PUT $BASE/api/tasks/$TASK_ID -H 'Aut
 check "删除任务"            "curl -s -X DELETE $BASE/api/tasks/$TASK_ID -H 'Authorization: Bearer $TOKEN'" '删除成功'
 check "404详情"            "curl -s $BASE/api/tasks/99999 -H 'Authorization: Bearer $TOKEN'"   '404'
 check "限流头"              "curl -sD- $BASE/api/demo/throttle -o /dev/null" 'X-RateLimit-Remaining'
+check "路径穿越被拒(/../.env)"     "curl -s --path-as-is -o /dev/null -w '%{http_code}' $BASE/../.env" '404'
+check "路径穿越被拒(编码变体)"     "curl -s -o /dev/null -w '%{http_code}' '$BASE/..%2f.env'" '404'
+check "越权访问他人任务403"        "curl -s $BASE/api/users/2/tasks -H 'Authorization: Bearer $TOKEN'" '"code":403'
 
 echo "── 5. Web 页面 ──"
 check "首页200"            "curl -s -o /dev/null -w '%{http_code}' $BASE/"                     '200'

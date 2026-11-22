@@ -11,7 +11,7 @@ use AlphaKit\Console\Command;
  */
 class MakeController extends Command
 {
-    protected string $signature = 'make:controller {name : 控制器类名} {--api : 生成 API 风格} {--resource : 生成资源控制器}';
+    protected string $signature = 'make:controller {name : 控制器类名} {--api : 生成 API 风格} {--resource : 生成资源控制器} {--force : 覆盖已存在文件}';
     protected string $description = '生成控制器类文件';
 
     protected function handle(): ?int
