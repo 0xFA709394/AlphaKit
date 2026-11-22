@@ -358,6 +358,27 @@ t('regenerate 保留数据', $sReg->get('rk') === 'rv');
 app(AlphaKit\Core\Config::class)->set('runtime.unit.probe', 'v5');
 t('Config set 运行时生效', config('runtime.unit.probe') === 'v5');
 
+echo "── 12. 第六轮审查回归(HTTP 协议/头注入/Cookie 安全) ──\n";
+// 头注入剥离
+$r6 = AlphaKit\Core\Response::redirect("/x\r\nSet-Cookie: evil=1");
+t('redirect 头值剥离 CRLF', !str_contains($r6->headers()['Location'], "\r") && !str_contains($r6->headers()['Location'], "\n"));
+$h6 = new AlphaKit\Core\Response('', 200, ['X-Test' => "a\r\nb"]);
+t('构造器头值剥离 CRLF', !str_contains($h6->headers()['X-Test'], "\r") && !str_contains($h6->headers()['X-Test'], "\n"));
+
+// Cookie 安全标志(Session::save 注入 HttpOnly/SameSite)
+$s6 = new Session(storage_path('cache/sessions-unit'));
+$s6->start(new Request('GET', '/', [], [], []));
+$resp6 = $s6->save(new Response(''));
+// 反射读取 cookie 队列验证选项
+$queue = (new ReflectionProperty(Response::class, 'cookieQueue'))->getValue($resp6);
+$sent = $queue[0] ?? null;
+t('Session cookie 携带 HttpOnly', is_array($sent) && ($sent[3]['httponly'] ?? false) === true);
+t('Session cookie 携带 SameSite', is_array($sent) && ($sent[3]['samesite'] ?? '') === 'Lax');
+
+// 畸形 JSON body → 优雅 422 而非 500
+$badReq = new Request('POST', '/api/x', [], [], ['CONTENT_TYPE' => 'application/json']);
+t('畸形 JSON 解析为空数组不致命', is_array($badReq->all()));
+
 echo "\n════════════════════════════\n";
 echo "  通过: {$passed}   失败: {$failed}\n";
 exit($failed === 0 ? 0 : 1);

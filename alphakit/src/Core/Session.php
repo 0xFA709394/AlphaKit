@@ -138,7 +138,12 @@ class Session
 
         $cookieName = (string)config('session.cookie', 'alphakit_session');
         $lifetime = (int)config('session.lifetime', 7200);
-        return $response->withCookie($cookieName, $this->id, time() + $lifetime);
+        // HttpOnly 防 XSS 窃取会话;SameSite=Lax 缓解 CSRF;HTTPS 部署可开 secure
+        return $response->withCookie($cookieName, $this->id, time() + $lifetime, [
+            'httponly' => true,
+            'samesite' => 'Lax',
+            'secure' => (bool)config('session.secure', false),
+        ]);
     }
 
     public function id(): string

@@ -29,7 +29,7 @@ class Response
         $this->body = is_array($body) ? http_build_query($body) : (string)$body;
         $this->status = $status;
         foreach ($headers as $name => $value) {
-            $this->headers[$name] = (string)$value;
+            $this->withHeader((string)$name, (string)$value);
         }
     }
 
@@ -94,16 +94,19 @@ class Response
 
     public function withHeader(string $name, string $value): self
     {
+        // 防头注入:剥离 CR/LF(用户输入流入头值时兜底)
+        $name = str_replace(["\r", "\n"], '', $name);
+        $value = str_replace(["\r", "\n"], ' ', $value);
         $this->headers[$name] = $value;
         return $this;
     }
 
-    /** @var array<string, array{string, string, int}> cookies 待发送 */
+    /** @var array<string, array{string, string, int, array}> cookies 待发送 */
     protected array $cookieQueue = [];
 
-    public function withCookie(string $name, string $value, int $expire = 0): self
+    public function withCookie(string $name, string $value, int $expire = 0, array $options = []): self
     {
-        $this->cookieQueue[] = [$name, $value, $expire];
+        $this->cookieQueue[] = [$name, $value, $expire, $options];
         return $this;
     }
 
@@ -130,8 +133,9 @@ class Response
             foreach ($this->headers as $name => $value) {
                 header($name . ': ' . $value);
             }
-            foreach ($this->cookieQueue as [$name, $value, $expire]) {
-                setcookie($name, $value, $expire);
+            foreach ($this->cookieQueue as [$name, $value, $expire, $options]) {
+                // PHP 7.3+ 数组签名:统一携带 path;安全标志由调用方(如 Session)注入
+                setcookie($name, $value, array_merge(['expires' => $expire, 'path' => '/'], $options));
             }
         }
         echo $this->body;
