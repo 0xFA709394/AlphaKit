@@ -322,11 +322,11 @@ abstract class Model implements \JsonSerializable
         return app(QueryBuilder::class)->useModel(new static());
     }
 
-    /** 魔术访问:属性优先,其次关联方法 */
+    /** 魔术访问:属性(应用 casts,与 toArray 一致),其次关联方法 */
     public function __get(string $key)
     {
         if (array_key_exists($key, $this->attributes)) {
-            return $this->attributes[$key];
+            return $this->castAttribute($key, $this->attributes[$key]);
         }
         if (method_exists($this, $key)) {
             return $this->relation($key);

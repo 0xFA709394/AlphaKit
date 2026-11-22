@@ -36,7 +36,8 @@ class Connection
                 $this->pdo = new \PDO($dsn);
                 $this->pdo->exec('PRAGMA foreign_keys = ON');
             } elseif ($driver === 'mysql') {
-                $dsn = sprintf(
+                // 支持完整 DSN 覆盖(unix socket 等场景),否则按 host/port/dbname 拼装
+                $dsn = $config['dsn'] ?? sprintf(
                     'mysql:host=%s;port=%s;dbname=%s;charset=%s',
                     $config['host'] ?? '127.0.0.1',
                     $config['port'] ?? 3306,

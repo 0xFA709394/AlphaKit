@@ -161,19 +161,27 @@ class QueueManager
         if ($conn->tableExists('jobs')) {
             return;
         }
-        $id = $conn->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql'
+        $isMysql = $conn->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql';
+        // 列名按方言转义:MySQL 默认模式下双引号是字符串字面量,硬编码会语法错误;
+        // MySQL 下短列用 VARCHAR(TEXT 组合索引超 3072 字节上限,报 1071)
+        $q = $isMysql ? '`' : '"';
+        $short = $isMysql ? 'VARCHAR(100)' : 'TEXT';
+        $stamp = $isMysql ? 'VARCHAR(32)' : 'TEXT';
+        $id = $isMysql
             ? '`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY'
             : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
         $conn->execute("CREATE TABLE IF NOT EXISTS {$conn->wrap('jobs')} (
             {$id},
-            \"queue\" TEXT NOT NULL DEFAULT 'default',
-            \"payload\" TEXT NOT NULL,
-            \"attempts\" INTEGER NOT NULL DEFAULT 0,
-            \"reserved_at\" TEXT NULL,
-            \"available_at\" TEXT NOT NULL,
-            \"created_at\" TEXT NOT NULL
+            {$q}queue{$q} {$short} NOT NULL DEFAULT 'default',
+            {$q}payload{$q} TEXT NOT NULL,
+            {$q}attempts{$q} INTEGER NOT NULL DEFAULT 0,
+            {$q}reserved_at{$q} {$stamp} NULL,
+            {$q}available_at{$q} {$stamp} NOT NULL,
+            {$q}created_at{$q} {$stamp} NOT NULL
         )");
-        if ($conn->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) !== 'mysql') {
+        if ($isMysql) {
+            $conn->execute("CREATE INDEX `jobs_queue_idx` ON {$conn->wrap('jobs')} (`queue`, `reserved_at`, `available_at`)");
+        } else {
             $conn->execute('CREATE INDEX IF NOT EXISTS "jobs_queue_idx" ON ' . $conn->wrap('jobs') . ' ("queue", "reserved_at", "available_at")');
         }
     }
@@ -184,15 +192,17 @@ class QueueManager
         if ($conn->tableExists('failed_jobs')) {
             return;
         }
-        $id = $conn->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql'
+        $isMysql = $conn->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql';
+        $q = $isMysql ? '`' : '"';
+        $id = $isMysql
             ? '`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY'
             : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
         $conn->execute("CREATE TABLE IF NOT EXISTS {$conn->wrap('failed_jobs')} (
             {$id},
-            \"queue\" TEXT NOT NULL DEFAULT 'default',
-            \"payload\" TEXT NOT NULL,
-            \"error\" TEXT NOT NULL,
-            \"failed_at\" TEXT NOT NULL
+            {$q}queue{$q} TEXT NOT NULL DEFAULT 'default',
+            {$q}payload{$q} TEXT NOT NULL,
+            {$q}error{$q} TEXT NOT NULL,
+            {$q}failed_at{$q} TEXT NOT NULL
         )");
     }
 }

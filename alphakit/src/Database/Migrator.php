@@ -20,6 +20,7 @@ class Migrator
     protected function ensureMigrationsTable(): void
     {
         if (!$this->connection->tableExists('migrations')) {
+            // 列名必须按方言转义:MySQL 默认模式下双引号是字符串字面量,建表会语法错误
             $driver = $this->connection->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME);
             $id = $driver === 'mysql' ? '`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY' : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
             $migration = $this->connection->wrap('migration');
