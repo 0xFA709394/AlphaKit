@@ -128,7 +128,12 @@ class Application extends Container
         date_default_timezone_set(is_string($timezone) && $timezone !== '' ? $timezone : 'Asia/Shanghai');
 
         set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
+            // 被 @ 抑制的错误直接吞掉
             if (!(error_reporting() & $severity)) {
+                return true;
+            }
+            // 废弃告警不升级为异常(PHP 8.x 下第三方/用户代码大量触发,升级会误伤正常流程)
+            if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
                 return true;
             }
             throw new \ErrorException($message, 0, $severity, $file, $line);

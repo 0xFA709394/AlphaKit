@@ -135,8 +135,11 @@ class Migrator
      */
     protected function resolve(string $file, string $name): Migration
     {
-        // 去掉日期前缀 2024_01_01_000001_
-        $base = preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', '', $name) ?? $name;
+        // 剥离日期前缀:兼容 20261122_140102_ / 2024_01_01_000001_ 等任意"纯数字段_"序列
+        $base = $name;
+        while (preg_match('/^\d+_/', $base)) {
+            $base = substr($base, (int)strpos($base, '_') + 1);
+        }
         $class = str_replace('_', '', ucwords($base, '_'));
 
         // require 前预检:类名已存在 = 与其他迁移文件同名(fatal 不可捕获,必须提前拦截)

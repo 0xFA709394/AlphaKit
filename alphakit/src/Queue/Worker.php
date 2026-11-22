@@ -67,16 +67,22 @@ class Worker
     {
         $instance = @unserialize($job['payload']);
 
-        if ($instance === false || !is_object($instance) || !method_exists($instance, 'handle')) {
+        // 坏任务判定:反序列化失败 / 非对象 / 类定义缺失(incomplete) / 无 handle()
+        // 类缺失常见于部署了旧 worker 或 job 类改名,必须删除并记录而不是让进程崩溃
+        if ($instance === false
+            || !is_object($instance)
+            || $instance instanceof \__PHP_Incomplete_Class
+            || !method_exists($instance, 'handle')
+        ) {
             $this->queue->deleteJob($job['id']);
             $this->failed++;
-            $this->logger->error('队列任务无法反序列化', ['id' => $job['id']]);
+            $this->logger->error('队列任务无法反序列化(类缺失或结构非法)', ['id' => $job['id'], 'attempts' => $job['attempts']]);
             return;
         }
 
-        $tries = (int)(isset($instance->tries) ? $instance->tries : 1);
-
         try {
+            $tries = (int)(isset($instance->tries) ? $instance->tries : 1);
+
             $this->resolveDependencies($instance);
             $instance->handle();
             $this->queue->deleteJob($job['id']);

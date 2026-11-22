@@ -248,6 +248,41 @@ $badJson = Response::json(['bad' => "\xB1\x31"]);
 t('非法 UTF-8 JSON 仍有响应体', $badJson->body() !== '' && str_contains($badJson->body(), 'bad'));
 t('非法 UTF-8 JSON 含替换符', str_contains($badJson->body(), "\u{FFFD}"));
 
+echo "── 10. 第三轮审查回归 ──\n";
+// E_DEPRECATED 不再升级为异常(PHP 8.5 下第三方代码大量触发)
+t('deprecation 不抛异常', (function () {
+    try {
+        @trigger_error('dep probe', E_USER_DEPRECATED);
+        return true;
+    } catch (Throwable) {
+        return false;
+    }
+})());
+
+// Worker 遇到类缺失的历史任务:删除+计数,进程不崩
+$conn = app(Connection::class);
+$conn->execute('DELETE FROM jobs WHERE queue = ?', ['unit3']);
+$conn->insert('jobs', ['queue' => 'unit3', 'payload' => 'O:9:"GhostCls":1:{s:1:"x";s:1:"y";}', 'attempts' => 0, 'reserved_at' => null, 'available_at' => date('Y-m-d H:i:s'), 'created_at' => date('Y-m-d H:i:s')]);
+$unitWorker = new AlphaKit\Queue\Worker(app(AlphaKit\Queue\QueueManager::class), logger('unit3'));
+$unitWorker->run('unit3', daemon: false);
+$ghostStats = $unitWorker->stats();
+t('类缺失任务不崩 worker 且计入失败', $ghostStats['failed'] === 1 && $ghostStats['processed'] === 0);
+t('类缺失任务已从队列删除', (int)$conn->scalar('SELECT COUNT(*) FROM jobs WHERE queue = ?', ['unit3']) === 0);
+
+// Migrator 类名推导兼容两种日期前缀格式(生成器 Ymd_His 与内置 Y_m_d_NNNNNN)
+$resolve = new ReflectionMethod(AlphaKit\Database\Migrator::class, 'resolve');
+$mig = app(AlphaKit\Database\Migrator::class);
+$migFile = database_path('migrations/9999_01_01_000001_unit_prefix_a.php');
+file_put_contents($migFile, '<?php use AlphaKit\Database\Migration; final class UnitPrefixA extends Migration { public function up(): void {} }');
+$t1 = $resolve->invoke($mig, $migFile, '9999_01_01_000001_unit_prefix_a') instanceof AlphaKit\Database\Migration;
+@unlink($migFile);
+$migFile2 = database_path('migrations/20261122_140102_unit_prefix_b.php');
+file_put_contents($migFile2, '<?php use AlphaKit\Database\Migration; final class UnitPrefixB extends Migration { public function up(): void {} }');
+$t2 = $resolve->invoke($mig, $migFile2, '20261122_140102_unit_prefix_b') instanceof AlphaKit\Database\Migration;
+@unlink($migFile2);
+t('迁移前缀推导:六段数字格式', $t1);
+t('迁移前缀推导:Ymd_His 格式(生成器)', $t2);
+
 echo "\n════════════════════════════\n";
 echo "  通过: {$passed}   失败: {$failed}\n";
 exit($failed === 0 ? 0 : 1);
