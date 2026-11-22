@@ -1,0 +1,20 @@
+#!/usr/bin/env php
+<?php
+/**
+ * AlphaKit 控制台入口
+ *
+ * 用法: php bin/alphakit <command>
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/../alphakit/bootstrap.php';
+
+// CLI 才允许执行
+if (PHP_SAPI !== 'cli') {
+    exit("请在命令行运行\n");
+}
+
+$app = \AlphaKit\Core\Application::getInstance();
+
+exit($app->make(\AlphaKit\Console\ConsoleApplication::class)->run($argv));

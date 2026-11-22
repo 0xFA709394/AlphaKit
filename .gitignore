@@ -1,0 +1,55 @@
+# ─── 环境与密钥 ───
+.env
+.env.*.local
+*.pem
+*.key
+
+# ─── 运行时产物(日志/缓存/会话/视图编译) ───
+# 结构:忽略目录内容,但保留目录本身与 .gitkeep 占位
+storage/logs/*
+!storage/logs/.gitkeep
+
+storage/cache/*
+!storage/cache/data/
+!storage/cache/sessions/
+storage/cache/data/*
+!storage/cache/data/.gitkeep
+storage/cache/sessions/*
+!storage/cache/sessions/.gitkeep
+
+storage/framework/*
+!storage/framework/views/
+storage/framework/views/*
+!storage/framework/views/.gitkeep
+
+# ─── 数据库文件(SQLite 运行时生成) ───
+database/*.sqlite
+database/*.sqlite-journal
+database/*.sqlite-wal
+database/*.sqlite-shm
+*.db
+
+# ─── 依赖与编译产物 ───
+vendor/
+node_modules/
+composer.phar
+
+# ─── 测试 / 静态分析缓存 ───
+.phpunit.result.cache
+.phpunit.cache/
+.phpcs-cache
+.php-cs-fixer.cache
+.phpstan.*
+infection*.log
+
+# ─── IDE / 编辑器 ───
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── 系统文件 ───
+.DS_Store
+Thumbs.db
+desktop.ini

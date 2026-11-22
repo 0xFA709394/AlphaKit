@@ -1,0 +1,27 @@
+{
+    "name": "alphakit/alphakit",
+    "description": "AlphaKit - 一套支持各类需求类型的 PHP 快速开发框架 (API / Web / CLI / 队列 / 定时任务)",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=7.4"
+    },
+    "suggest": {
+        "ext-pdo_sqlite": "SQLite 数据库支持",
+        "ext-pdo_mysql": "MySQL 数据库支持",
+        "ext-redis": "Redis 缓存/队列驱动",
+        "ext-curl": "HTTP 客户端"
+    },
+    "autoload": {
+        "psr-4": {
+            "AlphaKit\\": "alphakit/src/",
+            "App\\": "app/"
+        },
+        "files": [
+            "alphakit/src/Support/helpers.php"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
